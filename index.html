@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VcM Gestionale Web</title>
+
+    <!-- FONT MODERNO: INTER -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Chart.js per i grafici -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="toastContainer" class="toast-container"></div>
+<!-- ================================================================ -->
+<!-- INDICATORE RICARICA (barra sottile in alto)                     -->
+<!-- ================================================================ -->
+<div id="indicatoreRic" class="indicatore-ric hidden">
+    <div class="indicatore-ric-bar"></div>
+</div>
+<!-- ================================================================ -->
+<!-- PULSANTE HAMBURGER (visibile solo su tablet/phone)              -->
+<!-- ================================================================ -->
+<button id="btnHamburger" onclick="apriMenuTablet()" class="btn-hamburger" aria-label="Apri menu">
+    <i class="fas fa-bars"></i>
+</button>
+
+<!-- ================================================================ -->
+<!-- OVERLAY SCURO (chiude il menu se cliccato fuori)               -->
+<!-- ================================================================ -->
+<div id="overlayMenu" onclick="chiudiMenuTablet()" class="overlay-menu hidden"></div>
+
+<!-- ================================================================ -->
+<!-- 1. SIDEBAR - NAVIGAZIONE PRINCIPALE -->
+<!-- ================================================================ -->
+<div class="fixed left-0 top-0 h-full w-60 bg-white shadow-xl flex flex-col z-40 border-r border-slate-200">
+    <div class="p-6 bg-vcm text-white text-center font-bold text-lg uppercase italic border-b border-blue-600/10 text-nowrap">
+        VcM Desktop
+    </div>
+    <nav class="flex-1 p-3 space-y-1 mt-2 text-sm font-medium">
+        <button onclick="cambiaSezione('clienti')"
+                class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-blue-50 text-slate-600 transition-all flex items-center group">
+            <i class="fas fa-users mr-3 text-vcm"></i>
+            Lista Clienti
+            <span id="badgeClienti"
+                  class="ml-auto text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">0</span>
+        </button>
+
+        <button onclick="cambiaSezione('fornitori')"
+                class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-blue-50 text-slate-600 transition-all flex items-center group">
+            <i class="fas fa-truck mr-3 text-vcm"></i>
+            Fornitori
+            <span id="badgeFornitori"
+                  class="ml-auto text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">0</span>
+        </button>
+
+        <button onclick="cambiaSezione('cestino')"
+                class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-red-50 text-red-400 transition-all flex items-center mt-4">
+            <i class="fas fa-trash-alt mr-3"></i>
+            Cestino
+            <span id="badgeCestino"
+                  class="ml-auto text-[10px] px-2 py-0.5 rounded-full badge-cestino-vuoto">0</span>
+        </button>
+
+        <div class="stats-container px-2 mt-4">
+            <div class="stats-header" onclick="toggleStats()">
+                <span><i class="fas fa-chart-pie mr-2"></i> STATISTICHE</span>
+                <i class="fas fa-chevron-down" id="statsToggleIcon"></i>
+            </div>
+            <div class="stats-body" id="statsBody">
+                <div class="stat-voce" onclick="apriPopupStatistiche('performance')">
+                    <span><i class="fas fa-chart-line mr-2 text-blue-500"></i> Performance</span>
+                    <span class="badge-count" id="statBadgePerformance">0</span>
+                </div>
+                <div class="stat-voce" onclick="apriPopupStatistiche('stati')">
+                    <span><i class="fas fa-tag mr-2 text-amber-500"></i> Stati Richiesta</span>
+                    <span class="badge-count stati" id="statBadgeStati">0</span>
+                </div>
+                <div class="stat-voce" onclick="apriPopupStatistiche('mete')">
+                    <span><i class="fas fa-globe-europe mr-2 text-emerald-500"></i> Mete Preferite</span>
+                    <span class="badge-count mete" id="statBadgeMete">0</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-3 border-t border-slate-100 text-[10px] text-slate-400">
+        <div id="statsCache" class="space-y-0.5">
+            <div class="flex items-center justify-between">
+                <span>Cache:</span>
+                <span id="cacheStatus" class="cache-badge missing">Nessuna</span>
+            </div>
+            <div id="cacheAge" class="text-[9px] text-slate-400"></div>
+            <div id="apiStats" class="text-[9px] text-slate-400 mt-1"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- 2. CONTENUTO PRINCIPALE -->
+<!-- ================================================================ -->
+<main class="ml-60 p-8">
+
+    <!-- Header -->
+    <div class="mb-6 flex justify-between items-center">
+        <div>
+            <h1 id="titolo-sezione" class="text-2xl font-black text-vcm uppercase tracking-tight">
+                VcM_Clienti
+            </h1>
+            <p id="info-cache" class="text-slate-400 text-[10px] italic">
+                Inizializzazione...
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <button id="btnNuovo" onclick="apriModalFornitore()"
+                    class="hidden bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-emerald-700 text-xs font-bold uppercase tracking-wider transition-all">
+                <i class="fas fa-plus mr-1"></i> Nuovo Fornitore
+            </button>
+            <button id="btnSvuotaCestino" onclick="svuotaCestino()"
+                    class="hidden btn-svuota-cestino">
+                <i class="fas fa-trash-alt"></i> Svuota cestino
+            </button>
+            <button onclick="refreshDati()"
+                    class="bg-vcm text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-600 text-xs font-bold uppercase tracking-wider transition-all">
+                <i class="fas fa-sync-alt mr-2 text-[10px]"></i> Aggiorna
+            </button>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- KPI CARDS -->
+    <!-- ============================================================ -->
+    <div id="kpiContainer" class="kpi-grid">
+        <!-- Generato dinamicamente da JavaScript -->
+    </div>
+
+    <!-- Barra Filtri -->
+    <div id="barFiltri"
+         class="flex gap-4 items-center bg-white p-3 rounded-xl border border-slate-200 mb-4 shadow-sm flex-wrap">
+
+        <div class="relative flex-1 min-w-[180px]">
+            <input type="text" id="inputRicerca" onkeyup="eseguiFiltro()"
+                   placeholder="Cerca per nome, cognome..."
+                   class="w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-400 text-sm outline-none">
+            <i class="fas fa-search absolute left-3 top-3 text-slate-300"></i>
+            <button onclick="pulisciRicerca()"
+                    class="absolute right-3 top-2.5 text-slate-300 hover:text-slate-600">
+                <i class="fas fa-times-circle"></i>
+            </button>
+        </div>
+
+        <div id="containerFiltroStato" class="flex items-center gap-2">
+            <span class="filter-label">Stato:</span>
+            <select id="filtroStato" onchange="eseguiFiltro()"
+                    class="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none bg-slate-50 min-w-[150px]">
+            </select>
+        </div>
+
+        <div id="containerFiltroMeta" class="flex items-center gap-2">
+            <span class="filter-label">Meta:</span>
+            <select id="filtroMetaSelect" onchange="eseguiFiltro()"
+                    class="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none bg-slate-50 min-w-[180px]">
+                <option value="">Tutte le mete</option>
+            </select>
+            <button onclick="pulisciMeta()"
+                    class="text-slate-300 hover:text-slate-600 transition-colors text-sm">
+                <i class="fas fa-times-circle"></i>
+            </button>
+        </div>
+
+        <div id="containerFiltroApp" class="flex items-center gap-2 px-4 border-l border-slate-100">
+            <input type="checkbox" id="checkAppuntamenti" onchange="eseguiFiltro()"
+                   class="w-4 h-4 accent-blue-600 cursor-pointer">
+            <label for="checkAppuntamenti"
+                   class="text-[10px] font-black text-slate-500 uppercase tracking-tighter cursor-pointer">
+                Appuntamenti
+            </label>
+        </div>
+    </div>
+
+    <!-- Barra Stato Filtri Attivi -->
+    <div id="statoFiltri"
+         class="hidden bg-slate-50 p-3 rounded-xl border border-slate-200 mb-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2 flex-wrap" id="filtriAttiviContainer">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+                    <i class="fas fa-filter mr-1"></i> Filtro attivo:
+                </span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="contatoreFiltrati" class="contatore-filtrati ok"></span>
+                <button onclick="azzeraFiltri()"
+                        class="btn-reset-filtri">
+                    <i class="fas fa-undo-alt"></i> Rimuovi filtro
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="content" class="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[500px]">
+        <div id="loadingState" class="flex flex-col items-center justify-center py-20">
+            <div class="spinner"></div>
+            <p class="text-slate-500 text-sm mt-4">Caricamento dati in corso...</p>
+            <p class="text-slate-400 text-xs mt-1">Primo avvio: scaricamento completo da Airtable</p>
+        </div>
+    </div>
+</main>
+
+<!-- ================================================================ -->
+<!-- 3. MODALE DETTAGLIO UNIFICATO -->
+<!-- ================================================================ -->
+<div id="modalVcm"
+     class="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] z-50 hidden flex items-center justify-center p-4 modal-fade">
+    <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full flex flex-col overflow-hidden animate-in fade-in duration-200 max-h-[95vh]">
+        <div id="modalContentFull" class="flex flex-col h-full overflow-y-auto content-scroll">
+        </div>
+    </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- 4. MODALE STATISTICHE POPUP -->
+<!-- ================================================================ -->
+<div id="modalStatPopup"
+     class="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] z-50 hidden flex items-center justify-center p-4 modal-fade">
+    <div class="bg-white rounded-xl shadow-2xl stat-popup-container flex flex-col overflow-hidden">
+        <div class="modal-header px-6 py-3 text-white flex items-center justify-between shadow-md sticky top-0 z-10">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-chart-pie text-lg" id="popupIcon"></i>
+                <h2 class="text-lg font-bold uppercase tracking-tight" id="popupTitolo">Statistiche</h2>
+            </div>
+            <button onclick="chiudiPopupStatistiche()"
+                    class="text-white/60 hover:text-white text-xl transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="stat-popup-content p-6" id="popupContent">
+            <div id="popupInner">
+                <div class="text-center text-slate-400 py-8">
+                    <i class="fas fa-spinner fa-spin text-2xl"></i>
+                    <p class="mt-2">Caricamento statistiche...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
