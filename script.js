@@ -339,33 +339,29 @@ function popolaDropdownMete() {
 // STATISTICHE
 // ================================================================
 function calcolaStatisticheTotali() {
+    // ★ Performance e Stati: solo clienti in lavorazione ★
+    const clientiInLavorazione = tuttiClienti.filter(c => c._inLavorazione && c.DaEliminare !== 'Si');
+    const totaleInLavorazione = clientiInLavorazione.length;
+
+    // ★ Mete: tutti i clienti attivi (come prima) ★
     const attivi = getClientiAttivi();
-    const totaleAttivi = attivi.length;
 
-    if (totaleAttivi === 0) {
-        return {
-            totaleAttivi: 0,
-            performance: { appuntamenti: 0, richieste: 0, clientiConMeta: 0, clientiSenzaMeta: 0 },
-            stati: [],
-            mete: [],
-            totaleMete: 0,
-            clientiCestino: getClientiCestino().length
-        };
-    }
-
-    const conAppuntamento = attivi.filter(c =>
+    // ---- 1. PERFORMANCE sui clienti IN LAVORAZIONE ----
+    const conAppuntamento = clientiInLavorazione.filter(c =>
         c.DataAppuntamento &&
         c.DataAppuntamento !== "" &&
         c.DataAppuntamento !== "null"
     );
     const appuntamenti = conAppuntamento.length;
-    const richieste = totaleAttivi - appuntamenti;
+    const richieste = totaleInLavorazione - appuntamenti;
 
-    const statiMap = contaStati(attivi);
+    // ---- 2. STATI sui clienti IN LAVORAZIONE ----
+    const statiMap = contaStati(clientiInLavorazione);
     const stati = Object.entries(statiMap)
         .map(([key, data]) => ({ nome: data.label, conteggio: data.count }))
         .sort((a, b) => b.conteggio - a.conteggio);
 
+    // ---- 3. METE su TUTTI i clienti attivi ----
     const meteMap = {};
     attivi.forEach(c => {
         const meta = c['Dove vuoi andare?'];
@@ -390,8 +386,9 @@ function calcolaStatisticheTotali() {
     });
 
     return {
-        totaleAttivi,
-        performance: { appuntamenti, richieste, clientiConMeta, clientiSenzaMeta: totaleAttivi - clientiConMeta },
+        totaleAttivi: attivi.length,               // totale per la card "Clienti"
+        totaleInLavorazione: totaleInLavorazione,  // totale per Performance/Stati
+        performance: { appuntamenti, richieste, clientiConMeta, clientiSenzaMeta: attivi.length - clientiConMeta },
         stati,
         mete,
         totaleMete: mete.length,
@@ -411,6 +408,27 @@ function aggiornaStatisticheUI() {
     if (badgeMete) badgeMete.textContent = data.totaleMete;
 
     aggiornaKPI(data);
+}
+
+/**
+ * Aggiorna i badge della sidebar (Clienti, Fornitori, Cestino).
+ * Va chiamata ogni volta che i dati cambiano.
+ */
+function aggiornaBadgeSidebar() {
+    const badgeClienti = document.getElementById('badgeClienti');
+    if (badgeClienti) badgeClienti.textContent = tuttiClienti.length;
+
+    const badgeFornitori = document.getElementById('badgeFornitori');
+    if (badgeFornitori) badgeFornitori.textContent = tuttiFornitori.length;
+
+    const badgeCestino = document.getElementById('badgeCestino');
+    if (badgeCestino) {
+        const countCestino = tuttiClienti.filter(c => c.DaEliminare === 'Si').length;
+        badgeCestino.textContent = countCestino;
+        badgeCestino.className = countCestino === 0
+            ? 'ml-auto text-[10px] px-2 py-0.5 rounded-full badge-cestino-vuoto'
+            : 'ml-auto text-[10px] px-2 py-0.5 rounded-full badge-cestino-pieno';
+    }
 }
 
 // ================================================================
@@ -630,6 +648,7 @@ async function caricaTuttiIDati(forza = false) {
         cache.updateStats('cestino');
         cache.updateStatusDisplay();
         aggiornaStatisticheUI();
+        aggiornaBadgeSidebar();  // ★ NUOVA RIGA ★
 
         const infoEl = document.getElementById('info-cache');
         if (infoEl) {
@@ -688,11 +707,12 @@ async function ricaricaInBackground() {
         meteUniche = estraiMeteUniche();
         popolaDropdownMete();
 
-        cache.updateStats('clienti');
-        cache.updateStats('fornitori');
-        cache.updateStats('cestino');
-        cache.updateStatusDisplay();
-        aggiornaStatisticheUI();
+cache.updateStats('clienti');
+cache.updateStats('fornitori');
+cache.updateStats('cestino');
+cache.updateStatusDisplay();
+aggiornaStatisticheUI();
+aggiornaBadgeSidebar();  // ★ NUOVA RIGA ★
 
         const infoEl = document.getElementById('info-cache');
         if (infoEl) {
@@ -1275,14 +1295,14 @@ function apriPopupStatistiche(tipo) {
 }
 
 function generaPopupPerformance(data) {
-    const { totaleAttivi, performance } = data;
-    const pctApp = totaleAttivi > 0 ? (performance.appuntamenti / totaleAttivi * 100).toFixed(2) : 0;
-    const pctRic = totaleAttivi > 0 ? (performance.richieste / totaleAttivi * 100).toFixed(2) : 0;
+    const { totaleInLavorazione, performance } = data;
+    const pctApp = totaleInLavorazione > 0 ? (performance.appuntamenti / totaleInLavorazione * 100).toFixed(2) : 0;
+    const pctRic = totaleInLavorazione > 0 ? (performance.richieste / totaleInLavorazione * 100).toFixed(2) : 0;
 
     return `
         <div class="colonna-statistiche">
             <div class="mb-4"><div class="text-sm text-slate-500">
-                Totale clienti: <span class="font-bold text-slate-800">${totaleAttivi}</span>
+                Clienti in lavorazione: <span class="font-bold text-slate-800">${totaleInLavorazione}</span>
             </div></div>
             <div class="space-y-3">
                 <div class="stat-popup-row" onclick="filtraPerAppuntamento(true)">
@@ -1301,8 +1321,8 @@ function generaPopupPerformance(data) {
                 </div>
                 <div class="stat-popup-row" onclick="filtraTuttiClienti()" style="background:#f8fafc;border-radius:4px;">
                     <div class="flex justify-between items-center">
-                        <span class="text-sm font-medium text-slate-700"><i class="fas fa-users text-vcm mr-2"></i>Totale clienti</span>
-                        <span class="font-bold text-slate-800">${totaleAttivi}</span>
+                        <span class="text-sm font-medium text-slate-700"><i class="fas fa-users text-vcm mr-2"></i>Totale clienti (tutti)</span>
+                        <span class="font-bold text-slate-800">${data.totaleAttivi}</span>
                     </div>
                 </div>
             </div>
@@ -1312,15 +1332,15 @@ function generaPopupPerformance(data) {
 }
 
 function generaPopupStati(data) {
-    const { totaleAttivi, stati } = data;
-    if (stati.length === 0) return `<div class="text-center text-slate-400 py-8">Nessuno stato</div>`;
+    const { totaleInLavorazione, stati } = data;
+    if (stati.length === 0) return `<div class="text-center text-slate-400 py-8">Nessuno stato registrato nei clienti in lavorazione</div>`;
 
     let html = `<div class="colonna-statistiche"><div class="mb-4"><div class="text-sm text-slate-500">
-        Totale: <span class="font-bold text-slate-800">${totaleAttivi}</span> | Stati: <span class="font-bold text-slate-800">${stati.length}</span>
+        Clienti in lavorazione: <span class="font-bold text-slate-800">${totaleInLavorazione}</span> | Stati: <span class="font-bold text-slate-800">${stati.length}</span>
     </div></div><div class="space-y-2">`;
 
     stati.forEach(s => {
-        const pct = totaleAttivi > 0 ? (s.conteggio / totaleAttivi * 100).toFixed(2) : 0;
+        const pct = totaleInLavorazione > 0 ? (s.conteggio / totaleInLavorazione * 100).toFixed(2) : 0;
         let barClass = 'status-altri';
         if (s.nome === 'Contattato') barClass = 'status-contattato';
         else if (s.nome === 'Venduto') barClass = 'status-venduto';
