@@ -8,7 +8,7 @@
 // CONFIGURAZIONE
 // ================================================================
 const CONFIG = {
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz_bheYOQ7FYomtYJnS0nwvvA_Cs-hwf_zTsEYg_uO1k7dAgaE-x00ehjX6kfCmCnr-6A/exec',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwpFR9DhRKKrDSt8TKoRq4jdLKbeJ-hV28f8oSGcFbLTnGbf4oEosRoy9aN8wkuzN2WKw/exec',
     LABEL_CLIENTI: 'Clienti',
     LABEL_FORNITORI: 'Fornitori e servizi',
     CACHE_EXPIRATION_HOURS: 0.0125,  // 45 secondi
